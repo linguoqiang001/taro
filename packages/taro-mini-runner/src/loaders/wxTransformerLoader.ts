@@ -21,7 +21,7 @@ const cannotRemoves = ['@tarojs/taro', 'react', 'nervjs']
 
 const cachedResults = new Map()
 
-export default function wxTransformerLoader (source) {
+export default function wxTransformerLoader(source) {
   const {
     babel: babelConfig,
     alias,
@@ -34,15 +34,27 @@ export default function wxTransformerLoader (source) {
     isBuildQuickapp,
     isUseComponentBuildPage
   } = getOptions(this)
+  // 当前编译文件路径
   const filePath = this.resourcePath
+  // ?后那部分
   const { resourceQuery } = this
   const rawQuery = resourceQuery.slice(1)
   const inheritQuery = `&${rawQuery}`
+  // 分析如：a=1&b=2，获取参数对象
   const incomingQuery = qs.parse(rawQuery)
   try {
     const stringifyRequestFn = r => stringifyRequest(this, r)
+    /**
+     * 获取minitype，从incomingQuery、this._module、PARSE_AST_TYPE取
+     * minType: {
+     *  'app.tsx': 'ENTRY',
+     *  'index/index.tsx': 'PAGE',
+     *  '/node_modules/@tarojs/taro-weapp/index.js': 'NORMAL'
+     * }
+     */
     const miniType = (incomingQuery.parse ? incomingQuery.parse : this._module.miniType) || PARSE_AST_TYPE.NORMAL
     const rootProps: { [key: string]: any } = {}
+    // 快应用相关，不看
     if (isBuildQuickapp && miniType === PARSE_AST_TYPE.PAGE) {
       // 如果是快应用，需要提前解析一次 ast，获取 config
       const aheadTransformResult = wxTransformer({
@@ -84,16 +96,23 @@ export default function wxTransformerLoader (source) {
     }
     let template, transCode
     if (!incomingQuery.parse) {
+      // 经过wxTransformer，代码被转换成了小程序格式
       const transformResult = wxTransformer(wxTransformerParams)
       const ast = transformResult.ast
+      // 转换后wxml内容
       template = transformResult.template
+      // 加工ast
       const newAst = transformFromAst(ast, '', {
         plugins: [
+          // 转换动态js内容
           [require('babel-plugin-preval')],
+          // 移除无用import
           [require('babel-plugin-danger-remove-unused-import'), { ignore: cannotRemoves }],
-          [require('babel-plugin-transform-define').default,constantsReplaceList]
+          // 处理代码中的常量转换
+          [require('babel-plugin-transform-define').default, constantsReplaceList]
         ]
       }).ast as t.File
+      // 在次加工ast
       const result = processAst({
         ast: newAst,
         buildAdapter,
@@ -106,11 +125,14 @@ export default function wxTransformerLoader (source) {
         isBuildQuickapp,
         isUseComponentBuildPage
       })
+      // 将ast转换为代码
       const code = generate(result).code
+      // 在对code经过bable转换
       const res = transform(code, babelConfig)
       if (NODE_MODULES_REG.test(filePath) && res.code) {
         res.code = npmCodeHack(filePath, res.code)
       }
+      // 转换后js代码
       transCode = res.code
       cachedResults.set(filePath, {
         template,

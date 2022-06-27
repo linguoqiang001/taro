@@ -55,7 +55,7 @@ export default class Kernel extends EventEmitter {
   runOpts: any
   debugger: any
 
-  constructor (options: IKernelOptions) {
+  constructor(options: IKernelOptions) {
     super()
     this.debugger = createDebug('Taro:Kernel')
     this.appPath = options.appPath || process.cwd()
@@ -68,7 +68,7 @@ export default class Kernel extends EventEmitter {
     this.initHelper()
   }
 
-  async init () {
+  async init() {
     this.debugger('init')
     this.initConfig()
     this.initPaths()
@@ -76,7 +76,7 @@ export default class Kernel extends EventEmitter {
     await this.applyPlugins('onReady')
   }
 
-  initConfig () {
+  initConfig() {
     this.config = new Config({
       appPath: this.appPath
     })
@@ -84,7 +84,7 @@ export default class Kernel extends EventEmitter {
     this.debugger('initConfig', this.initialConfig)
   }
 
-  initPaths () {
+  initPaths() {
     this.paths = {
       appPath: this.appPath,
       nodeModulesPath: recursiveFindNodeModules(path.join(this.appPath, NODE_MODULES))
@@ -99,12 +99,12 @@ export default class Kernel extends EventEmitter {
     this.debugger(`initPaths:${JSON.stringify(this.paths, null, 2)}`)
   }
 
-  initHelper () {
+  initHelper() {
     this.helper = helper
     this.debugger('initHelper')
   }
 
-  initPresetsAndPlugins () {
+  initPresetsAndPlugins() {
     const initialConfig = this.initialConfig
     const allConfigPresets = mergePlugins(this.optsPresets || [], initialConfig.presets || [])()
     const allConfigPlugins = mergePlugins(this.optsPlugins || [], initialConfig.plugins || [])()
@@ -118,14 +118,15 @@ export default class Kernel extends EventEmitter {
     this.resolvePlugins(allConfigPlugins)
   }
 
-  resolvePresets (presets) {
+  resolvePresets(presets) {
+
     const allPresets = resolvePresetsOrPlugins(this.appPath, presets, PluginType.Preset)
     while (allPresets.length) {
       this.initPreset(allPresets.shift()!)
     }
   }
 
-  resolvePlugins (plugins) {
+  resolvePlugins(plugins) {
     const allPlugins = resolvePresetsOrPlugins(this.appPath, plugins, PluginType.Plugin)
     const _plugins = [...this.extraPlugins, ...allPlugins]
     while (_plugins.length) {
@@ -134,10 +135,10 @@ export default class Kernel extends EventEmitter {
     this.extraPlugins = []
   }
 
-  initPreset (preset: IPreset) {
+  initPreset(preset: IPreset) {
     this.debugger('initPreset', preset)
     const { id, path, opts, apply } = preset
-    const pluginCtx = this.initPluginCtx({id, path, ctx: this})
+    const pluginCtx = this.initPluginCtx({ id, path, ctx: this })
     const { presets, plugins } = apply()(pluginCtx, opts) || {}
     this.registerPlugin(preset)
     if (Array.isArray(presets)) {
@@ -151,7 +152,7 @@ export default class Kernel extends EventEmitter {
     }
   }
 
-  initPlugin (plugin: IPlugin) {
+  initPlugin(plugin: IPlugin) {
     const { id, path, opts, apply } = plugin
     const pluginCtx = this.initPluginCtx({ id, path, ctx: this })
     this.debugger('initPlugin', plugin)
@@ -160,7 +161,7 @@ export default class Kernel extends EventEmitter {
     this.checkPluginOpts(pluginCtx, opts)
   }
 
-  checkPluginOpts (pluginCtx, opts) {
+  checkPluginOpts(pluginCtx, opts) {
     if (typeof pluginCtx.optsSchema !== 'function') {
       return
     }
@@ -175,14 +176,14 @@ export default class Kernel extends EventEmitter {
     }
   }
 
-  registerPlugin (plugin: IPlugin) {
+  registerPlugin(plugin: IPlugin) {
     if (this.plugins.has(plugin.id)) {
       throw new Error(`插件 ${plugin.id} 已被注册`)
     }
     this.plugins.set(plugin.id, plugin)
   }
 
-  initPluginCtx ({ id, path, ctx }: { id: string, path: string, ctx: Kernel }) {
+  initPluginCtx({ id, path, ctx }: { id: string, path: string, ctx: Kernel }) {
     const pluginCtx = new Plugin({ id, path, ctx })
     const internalMethods = ['onReady', 'onStart']
     const kernelApis = [
@@ -211,7 +212,7 @@ export default class Kernel extends EventEmitter {
     })
   }
 
-  async applyPlugins (args: string | { name: string, initialVal?: any, opts?: any }) {
+  async applyPlugins(args: string | { name: string, initialVal?: any, opts?: any }) {
     let name
     let initialVal
     let opts
@@ -254,7 +255,7 @@ export default class Kernel extends EventEmitter {
     return await waterfall.promise(initialVal)
   }
 
-  runWithPlatform (platform) {
+  runWithPlatform(platform) {
     if (!this.platforms.has(platform)) {
       throw `不存在编译平台 ${platform}`
     }
@@ -262,11 +263,11 @@ export default class Kernel extends EventEmitter {
     return withNameConfig
   }
 
-  setRunOpts (opts) {
+  setRunOpts(opts) {
     this.runOpts = opts
   }
 
-  async run (args: string | { name: string, opts?: any }) {
+  async run(args: string | { name: string, opts?: any }) {
     let name
     let opts
     if (typeof args === 'string') {

@@ -46,6 +46,7 @@ const defaultImageUrlLoaderOption = {
 const defaultCssModuleOption: PostcssOption.cssModules = {
   enable: false,
   config: {
+    // @ts-ignore
     namingPattern: 'global',
     generateScopedName: '[name]__[local]___[hash:base64:5]'
   }
@@ -148,7 +149,7 @@ export const getModule = (appPath: string, {
   const postcssOption: IPostcssOption = postcss || {}
 
   const cssModuleOptions: PostcssOption.cssModules = recursiveMerge({}, defaultCssModuleOption, postcssOption.cssModules)
-
+  // @ts-ignore
   const { namingPattern, generateScopedName } = cssModuleOptions.config!
 
   const cssOptions = [
@@ -170,8 +171,8 @@ export const getModule = (appPath: string, {
       },
       {
         modules: typeof generateScopedName === 'function'
-        ? { getLocalIdent: (context, _, localName) => generateScopedName(localName, context.resourcePath) }
-        : { localIdentName: generateScopedName }
+          ? { getLocalIdent: (context, _, localName) => generateScopedName(localName, context.resourcePath) }
+          : { localIdentName: generateScopedName }
       }
     ),
     cssLoaderOption
@@ -209,7 +210,7 @@ export const getModule = (appPath: string, {
   if (cssModuleOptions.enable) {
     const cssLoaderWithModule = getCssLoader(cssOptionsWithModule)
     let cssModuleCondition
-
+    // @ts-ignore
     if (cssModuleOptions.config!.namingPattern === 'module') {
       /* 不排除 node_modules 内的样式 */
       cssModuleCondition = styleModuleReg
@@ -392,7 +393,7 @@ export const getEntry = ({
   }
 }
 
-export function getOutput (appPath: string, [{ outputRoot, publicPath, globalObject }, customOutput]) {
+export function getOutput(appPath: string, [{ outputRoot, publicPath, globalObject }, customOutput]) {
   return {
     path: path.join(appPath, outputRoot),
     publicPath,
@@ -403,6 +404,6 @@ export function getOutput (appPath: string, [{ outputRoot, publicPath, globalObj
   }
 }
 
-export function getDevtool (enableSourceMap) {
+export function getDevtool(enableSourceMap) {
   return enableSourceMap ? 'cheap-module-eval-source-map' : 'none'
 }

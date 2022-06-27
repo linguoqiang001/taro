@@ -15,7 +15,7 @@ const customizeChain = async (chain, modifyWebpackChainFunc: Function, customize
   }
 }
 
-export default async function build (appPath: string, config: IBuildConfig) {
+export default async function build(appPath: string, config: IBuildConfig) {
   const mode = config.mode
   const baseWebpackChain = baseConf(appPath)
   await customizeChain(baseWebpackChain, config.modifyWebpackChain, config.webpackChain)
