@@ -70,8 +70,10 @@ export default class Kernel extends EventEmitter {
 
   async init() {
     this.debugger('init')
+    // 获取config/index内容
     this.initConfig()
     this.initPaths()
+    // 获取预设和插件
     this.initPresetsAndPlugins()
     await this.applyPlugins('onReady')
   }
@@ -109,6 +111,7 @@ export default class Kernel extends EventEmitter {
     const allConfigPresets = mergePlugins(this.optsPresets || [], initialConfig.presets || [])()
     const allConfigPlugins = mergePlugins(this.optsPlugins || [], initialConfig.plugins || [])()
     this.debugger('initPresetsAndPlugins', allConfigPresets, allConfigPlugins)
+    // 注册babel？
     createBabelRegister({
       only: [...Object.keys(allConfigPresets), ...Object.keys(allConfigPlugins)]
     })
@@ -127,6 +130,7 @@ export default class Kernel extends EventEmitter {
   }
 
   resolvePlugins(plugins) {
+    // 为plugin加上id,name等属性以及apply方法
     const allPlugins = resolvePresetsOrPlugins(this.appPath, plugins, PluginType.Plugin)
     const _plugins = [...this.extraPlugins, ...allPlugins]
     while (_plugins.length) {
@@ -148,6 +152,7 @@ export default class Kernel extends EventEmitter {
       }
     }
     if (Array.isArray(plugins)) {
+      // 将不同平台的插件复制给extraPlugins
       this.extraPlugins.push(...resolvePresetsOrPlugins(this.appPath, convertPluginsToObject(plugins)(), PluginType.Plugin))
     }
   }
@@ -156,7 +161,9 @@ export default class Kernel extends EventEmitter {
     const { id, path, opts, apply } = plugin
     const pluginCtx = this.initPluginCtx({ id, path, ctx: this })
     this.debugger('initPlugin', plugin)
+    // 将plugin加入到this.plugins中
     this.registerPlugin(plugin)
+    // 执行plugin的apply方法
     apply()(pluginCtx, opts)
     this.checkPluginOpts(pluginCtx, opts)
   }
@@ -196,8 +203,10 @@ export default class Kernel extends EventEmitter {
       'initialConfig',
       'applyPlugins'
     ]
+    // 为所有的pluginCtx注册'onReady', 'onStart'两个方法
     internalMethods.forEach(name => {
       if (!this.methods.has(name)) {
+        // 注册hooks,等待后续call
         pluginCtx.registerMethod(name)
       }
     })
@@ -281,8 +290,10 @@ export default class Kernel extends EventEmitter {
     this.debugger('command:runOpts')
     this.debugger(`command:runOpts:${JSON.stringify(opts, null, 2)}`)
     this.setRunOpts(opts)
+    // 初始化,如对所有插件执行apply, 读取config配置等等
     await this.init()
     this.debugger('command:onStart')
+    // 触发onStart钩子，自定义插件
     await this.applyPlugins('onStart')
     if (!this.commands.has(name)) {
       throw new Error(`${name} 命令不存在`)
@@ -302,6 +313,7 @@ export default class Kernel extends EventEmitter {
     if (opts && opts.platform) {
       opts.config = this.runWithPlatform(opts.platform)
     }
+    debugger
     await this.applyPlugins({
       name,
       opts

@@ -33,7 +33,7 @@ export default class TaroLoadChunksPlugin {
   destroyed: boolean
   isBuildQuickapp: boolean
 
-  constructor (options: IOptions) {
+  constructor(options: IOptions) {
     this.commonChunks = options.commonChunks
     this.isBuildPlugin = options.isBuildPlugin
     this.addChunkPages = options.addChunkPages
@@ -45,7 +45,7 @@ export default class TaroLoadChunksPlugin {
     this.destroyed = false
   }
 
-  apply (compiler: webpack.Compiler) {
+  apply(compiler: webpack.Compiler) {
     const pagesList = this.pages
     const addChunkPagesList = new Map<string, string[]>()
     const depsMap = this.depsMap
@@ -53,6 +53,7 @@ export default class TaroLoadChunksPlugin {
       if (this.destroyed) return
       let commonChunks
       let fileChunks = new Map()
+      // chunk 优化完成之后触发
       compilation.hooks.afterOptimizeChunks.tap(PLUGIN_NAME, (chunks) => {
         commonChunks = chunks.filter(chunk => this.commonChunks.includes(chunk.name)).reverse()
         if (typeof this.addChunkPages === 'function') {
@@ -109,12 +110,12 @@ export default class TaroLoadChunksPlugin {
           }
           if (this.isBuildQuickapp &&
             (entryModule.miniType === PARSE_AST_TYPE.PAGE ||
-            entryModule.miniType === PARSE_AST_TYPE.COMPONENT)) {
+              entryModule.miniType === PARSE_AST_TYPE.COMPONENT)) {
             return addRequireToSource(getIdOrName(chunk), modules, commonChunks)
           }
           if (fileChunks.size
             && (entryModule.miniType === PARSE_AST_TYPE.PAGE
-            || entryModule.miniType === PARSE_AST_TYPE.COMPONENT)) {
+              || entryModule.miniType === PARSE_AST_TYPE.COMPONENT)) {
             let source
             const id = getIdOrName(chunk)
             fileChunks.forEach((v, k) => {
@@ -134,14 +135,14 @@ export default class TaroLoadChunksPlugin {
   }
 }
 
-function getIdOrName (chunk) {
+function getIdOrName(chunk) {
   if (typeof chunk.id === 'string') {
     return chunk.id
   }
   return chunk.name
 }
 
-function getAllDepComponents (filePath, depsMap) {
+function getAllDepComponents(filePath, depsMap) {
   let componentsList = new Set<IComponentObj>()
   depsMap.forEach((value, key) => {
     if (filePath === key) {
@@ -154,7 +155,7 @@ function getAllDepComponents (filePath, depsMap) {
   return componentsList
 }
 
-function addRequireToSource (id, modules, commonChunks) {
+function addRequireToSource(id, modules, commonChunks) {
   const source = new ConcatSource()
   commonChunks.forEach(chunkItem => {
     const val = `require(${JSON.stringify(promoteRelativePath(path.relative(id, chunkItem.name)))});\n`

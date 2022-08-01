@@ -112,7 +112,7 @@ export default function wxTransformerLoader(source) {
           [require('babel-plugin-transform-define').default, constantsReplaceList]
         ]
       }).ast as t.File
-      // 在次加工ast
+      // 再次加工ast
       const result = processAst({
         ast: newAst,
         buildAdapter,

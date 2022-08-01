@@ -24,6 +24,7 @@ export default async function build(appPath: string, config: IBuildConfig) {
   const webpackConfig = webpackChain.toConfig()
   const onBuildFinish = config.onBuildFinish
   const compiler = webpack(webpackConfig)
+
   return new Promise((resolve, reject) => {
     if (config.isWatch) {
       bindDevLogger(compiler)
