@@ -36,7 +36,7 @@ export default function wxTransformerLoader(source) {
   } = getOptions(this)
   // 当前编译文件路径
   const filePath = this.resourcePath
-  // ?后那部分
+  // 地址?后那部分
   const { resourceQuery } = this
   const rawQuery = resourceQuery.slice(1)
   const inheritQuery = `&${rawQuery}`
@@ -87,11 +87,14 @@ export default function wxTransformerLoader(source) {
       rootProps: isEmptyObject(rootProps) || rootProps,
       env: constantsReplaceList
     }
+    // app.tsx
     if (miniType === PARSE_AST_TYPE.ENTRY) {
       wxTransformerParams.isApp = true
     } else if (miniType === PARSE_AST_TYPE.PAGE) {
+      // 页面
       wxTransformerParams.isRoot = true
     } else if (miniType === PARSE_AST_TYPE.NORMAL) {
+      // 一些js文件
       wxTransformerParams.isNormal = true
     }
     let template, transCode
@@ -147,6 +150,7 @@ export default function wxTransformerLoader(source) {
     let resultCode = ''
     if (miniType === PARSE_AST_TYPE.ENTRY || miniType === PARSE_AST_TYPE.PAGE || miniType === PARSE_AST_TYPE.COMPONENT) {
       if (incomingQuery.type === 'template') {
+        // this.callback用于传给下一个loader处理
         return this.callback(null, template)
       }
       if (incomingQuery.type === 'script') {
@@ -159,6 +163,8 @@ export default function wxTransformerLoader(source) {
       }
       const scriptQuery = `?taro&type=script&parse=${miniType}${inheritQuery}`
       const scriptRequest = stringifyRequestFn(filePath + scriptQuery)
+      // 通过`import { template } from ${stringifyRequestFn(filePath + query)}, import script from ${scriptRequest}
+      // 实现让wxml和js部分再次走到wxTransformerLoader方法，对其进行缓存，以及变成两个文件传给下一个loader
       const scriptImport = (
         `import script from ${scriptRequest}\n` +
         `export * from ${scriptRequest}` // support named exports

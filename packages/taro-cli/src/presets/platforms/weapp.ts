@@ -26,7 +26,7 @@ export default (ctx) => {
   ctx.registerPlatform({
     name: 'weapp',
     useConfigName: 'mini',
-    async fn ({ config }) {
+    async fn({ config }) {
       const { appPath, nodeModulesPath, outputPath } = ctx.paths
       const { npm, emptyDirectory } = ctx.helper
       const isBuildPlugin = config.isBuildPlugin || false

@@ -40,20 +40,20 @@ class BaseComponent {
   effects = []
   layoutEffects = []
 
-  constructor (props = {}, isPage) {
+  constructor(props = {}, isPage) {
     this.state = {}
     this.props = props
     this.$componentType = isPage ? 'PAGE' : 'COMPONENT'
     this.$prefix = genCompPrefix()
     this.isTaroComponent = this.$componentType && this.$router && this._pendingStates
   }
-  _constructor (props) {
+  _constructor(props) {
     this.props = props || {}
   }
-  _init (scope) {
+  _init(scope) {
     this.$scope = scope
   }
-  setState (state, callback) {
+  setState(state, callback) {
     if (state) {
       (this._pendingStates = this._pendingStates || []).push(state)
     }
@@ -65,7 +65,7 @@ class BaseComponent {
     }
   }
 
-  getState () {
+  getState() {
     const { _pendingStates, state, props } = this
     const stateClone = Object.assign({}, state)
     delete stateClone.__data
@@ -83,7 +83,7 @@ class BaseComponent {
     return stateClone
   }
 
-  forceUpdate (callback) {
+  forceUpdate(callback) {
     if (isFunction(callback)) {
       (this._pendingCallbacks = this._pendingCallbacks || []).push(callback)
     }
@@ -91,7 +91,7 @@ class BaseComponent {
     updateComponent(this)
   }
 
-  $preload (key, value) {
+  $preload(key, value) {
     const preloadData = cacheDataGet(PRELOAD_DATA_KEY) || {}
     if (typeof key === 'object') {
       for (const k in key) {
@@ -104,7 +104,7 @@ class BaseComponent {
   }
 
   // 会被匿名函数调用
-  __triggerPropsFn (key, args) {
+  __triggerPropsFn(key, args) {
     const keyChain = key.split('.')
     const reduxFnPrefix = '__event_'
     const reduxFnName = reduxFnPrefix + keyChain.shift()

@@ -13,7 +13,7 @@ const PRELOAD_DATA_KEY = 'preload'
 const preloadInitedComponent = '$preloadComponent'
 const pageExtraFns = ['onPullDownRefresh', 'onReachBottom', 'onShareAppMessage', 'onPageScroll', 'onTabItemTap', 'onResize']
 
-function bindProperties (weappComponentConf, ComponentClass, isPage) {
+function bindProperties(weappComponentConf, ComponentClass, isPage) {
   weappComponentConf.properties = {}
   if (isPage) {
     weappComponentConf.properties[routerParamsPrivateKey] = {
@@ -37,7 +37,7 @@ function bindProperties (weappComponentConf, ComponentClass, isPage) {
   weappComponentConf.properties.compid = {
     type: null,
     value: null,
-    observer (newVal, oldVal) {
+    observer(newVal, oldVal) {
       initComponent.apply(this, [ComponentClass, isPage])
       if (oldVal && oldVal !== newVal) {
         const { extraProps } = this.data
@@ -48,6 +48,7 @@ function bindProperties (weappComponentConf, ComponentClass, isPage) {
         }
         const nextProps = filterProps(component.constructor.defaultProps, propsManager.map[newVal], component.props, extraProps || null)
         this.$component.props = nextProps
+        console.log('-----');
         nextTick(() => {
           this.$component._unsafeCallUpdate = true
           updateComponent(this.$component)
@@ -59,12 +60,13 @@ function bindProperties (weappComponentConf, ComponentClass, isPage) {
   weappComponentConf.properties.extraProps = {
     type: null,
     value: null,
-    observer () {
+    observer() {
       // update Component
       if (!this.$component || !this.$component.__isReady) return
 
       const nextProps = filterProps(ComponentClass.defaultProps, {}, this.$component.props, this.data.extraProps)
       this.$component.props = nextProps
+      console.log('++++++');
       nextTick(() => {
         this.$component._unsafeCallUpdate = true
         updateComponent(this.$component)
@@ -74,19 +76,19 @@ function bindProperties (weappComponentConf, ComponentClass, isPage) {
   }
 }
 
-function bindBehaviors (weappComponentConf, ComponentClass) {
+function bindBehaviors(weappComponentConf, ComponentClass) {
   if (ComponentClass.behaviors) {
     weappComponentConf.behaviors = ComponentClass.behaviors
   }
 }
 
-function bindStaticOptions (weappComponentConf, ComponentClass) {
+function bindStaticOptions(weappComponentConf, ComponentClass) {
   if (ComponentClass.options) {
     weappComponentConf.options = ComponentClass.options
   }
 }
 
-function bindMultipleSlots (weappComponentConf, ComponentClass) {
+function bindMultipleSlots(weappComponentConf, ComponentClass) {
   const multipleSlots = ComponentClass.multipleSlots
   if (!multipleSlots) {
     return
@@ -97,7 +99,7 @@ function bindMultipleSlots (weappComponentConf, ComponentClass) {
   }
 }
 
-function bindStaticFns (weappComponentConf, ComponentClass) {
+function bindStaticFns(weappComponentConf, ComponentClass) {
   for (const key in ComponentClass) {
     typeof ComponentClass[key] === 'function' && (weappComponentConf[key] = ComponentClass[key])
   }
@@ -110,13 +112,13 @@ function bindStaticFns (weappComponentConf, ComponentClass) {
   })
 }
 
-function processEvent (eventHandlerName, obj) {
+function processEvent(eventHandlerName, obj) {
   if (obj[eventHandlerName]) return
 
   obj[eventHandlerName] = function (event) {
     if (event) {
-      event.preventDefault = function () {}
-      event.stopPropagation = function () {}
+      event.preventDefault = function () { }
+      event.stopPropagation = function () { }
       event.currentTarget = event.currentTarget || event.target || {}
       if (event.target) {
         Object.assign(event.target, event.detail)
@@ -198,7 +200,7 @@ function processEvent (eventHandlerName, obj) {
   }
 }
 
-function bindEvents (weappComponentConf, events, isPage) {
+function bindEvents(weappComponentConf, events, isPage) {
   weappComponentConf.methods = weappComponentConf.methods || {}
   const target = weappComponentConf.methods
   events.forEach(name => {
@@ -206,7 +208,7 @@ function bindEvents (weappComponentConf, events, isPage) {
   })
 }
 
-export function filterProps (defaultProps = {}, propsFromPropsManager = {}, curAllProps = {}, extraProps) {
+export function filterProps(defaultProps = {}, propsFromPropsManager = {}, curAllProps = {}, extraProps) {
   let newProps = Object.assign({}, curAllProps, propsFromPropsManager)
 
   if (!isEmptyObject(defaultProps)) {
@@ -224,7 +226,7 @@ export function filterProps (defaultProps = {}, propsFromPropsManager = {}, curA
   return newProps
 }
 
-function filterParams (data, defaultParams = {}) {
+function filterParams(data, defaultParams = {}) {
   let res = {}
   for (const paramName in defaultParams) {
     res[paramName] = paramName in data ? data[paramName] : defaultParams[paramName]
@@ -232,7 +234,7 @@ function filterParams (data, defaultParams = {}) {
   return res
 }
 
-export function componentTrigger (component, key, args) {
+export function componentTrigger(component, key, args) {
   args = args || []
 
   if (key === 'componentDidMount') {
@@ -288,7 +290,7 @@ export function componentTrigger (component, key, args) {
   }
 }
 
-function initComponent (ComponentClass, isPage) {
+function initComponent(ComponentClass, isPage) {
   if (this.$component.__isReady) return
   // ready之后才可以setData,
   // ready之前，小程序组件初始化时仍然会触发observer，__isReady为否的时候放弃处理observer
@@ -312,7 +314,7 @@ function initComponent (ComponentClass, isPage) {
   mountComponent(this.$component)
 }
 
-function createComponent (ComponentClass, isPage) {
+function createComponent(ComponentClass, isPage) {
   let initData = {}
   const componentProps = filterProps(ComponentClass.defaultProps)
   const componentInstance = new ComponentClass(componentProps)
@@ -333,7 +335,7 @@ function createComponent (ComponentClass, isPage) {
 
   const weappComponentConf = {
     data: initData,
-    created (options = {}) {
+    created(options = {}) {
       if (isPage && cacheDataHas(preloadInitedComponent)) {
         this.$component = cacheDataGet(preloadInitedComponent, true)
         this.$component.$componentType = 'PAGE'
@@ -345,7 +347,7 @@ function createComponent (ComponentClass, isPage) {
       this.$component.__propTypes = ComponentClass.propTypes
       Object.assign(this.$component.$router.params, options)
     },
-    attached () {
+    attached() {
       let hasParamsCache
       if (isPage) {
         // params
@@ -373,13 +375,13 @@ function createComponent (ComponentClass, isPage) {
         initComponent.apply(this, [ComponentClass, isPage])
       }
     },
-    ready () {
+    ready() {
       if (!isPage && !this.$component.__mounted) {
         this.$component.__mounted = true
         componentTrigger(this.$component, 'componentDidMount')
       }
     },
-    detached () {
+    detached() {
       const component = this.$component
       componentTrigger(component, 'componentWillUnmount')
       component.hooks.forEach((hook) => {

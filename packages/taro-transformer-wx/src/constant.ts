@@ -170,3 +170,5 @@ export const quickappComponentName = new Set([
   'Map',
   'Button'
 ])
+
+export const wxsFileRegx = /\.wxs$/

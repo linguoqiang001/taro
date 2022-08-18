@@ -313,7 +313,6 @@ export default class Kernel extends EventEmitter {
     if (opts && opts.platform) {
       opts.config = this.runWithPlatform(opts.platform)
     }
-    debugger
     await this.applyPlugins({
       name,
       opts

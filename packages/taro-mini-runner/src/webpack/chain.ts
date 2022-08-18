@@ -81,6 +81,7 @@ export const processEnvOption = partial(mapKeys as any, (key: string) => `proces
 
 export const getCssLoader = pipe(mergeOption, partial(getLoader, 'css-loader'))
 export const getPostcssLoader = pipe(mergeOption, partial(getLoader, 'postcss-loader'))
+export const getWxsLoader = pipe(mergeOption, partial(getLoader, path.resolve(__dirname, '../loaders/wxsLoader')))
 export const getUrlLoader = pipe(mergeOption, partial(getLoader, 'url-loader'))
 export const getFileLoader = pipe(mergeOption, partial(getLoader, 'file-loader'))
 export const getWxTransformerLoader = pipe(mergeOption, partial(getLoader, path.resolve(__dirname, '../loaders/wxTransformerLoader')))
@@ -241,6 +242,7 @@ export const getModule = (appPath: string, {
     }
   ])
 
+
   const parsedConstantsReplaceList = {}
   Object.keys(constantsReplaceList).forEach(key => {
     try {
@@ -249,6 +251,7 @@ export const getModule = (appPath: string, {
       parsedConstantsReplaceList[key] = constantsReplaceList[key]
     }
   })
+  // loaders/wxTransformerLoader.ts
   const wxTransformerLoader = getWxTransformerLoader([{
     babel,
     alias,
@@ -263,12 +266,16 @@ export const getModule = (appPath: string, {
   }])
 
   const miniTemplateLoader = getMiniTemplateLoader([])
+  const wxsLoader = getWxsLoader([])
 
+  // 处理tsx、jsx的loader，重点
   let scriptsLoaderConf = {
+    // REG_SCRIPTS：/\.[tj]sx?$/i
     test: REG_SCRIPTS,
     use: [wxTransformerLoader],
   }
 
+  // 增加排除的文件
   if (compileExclude && compileExclude.length) {
     scriptsLoaderConf = Object.assign({}, scriptsLoaderConf, {
       exclude: [
@@ -277,6 +284,7 @@ export const getModule = (appPath: string, {
     })
   }
 
+  // 增加包含文件
   if (compileInclude && compileInclude.length) {
     scriptsLoaderConf = Object.assign({}, scriptsLoaderConf, {
       include: [
@@ -286,7 +294,12 @@ export const getModule = (appPath: string, {
     })
   }
 
+  // 对应webpack.config下module.rule配置
   const rule: any = {
+    wxs: {
+      test: /\.wxs$/,
+      use: [wxsLoader]
+    },
     css: {
       test: styleReg,
       oneOf: cssLoaders

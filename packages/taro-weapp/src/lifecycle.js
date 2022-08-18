@@ -15,12 +15,12 @@ const isDEV = typeof process === 'undefined' ||
   !process.env ||
   process.env.NODE_ENV !== 'production'
 
-function hasNewLifecycle (component) {
+function hasNewLifecycle(component) {
   const { constructor: { getDerivedStateFromProps }, getSnapshotBeforeUpdate } = component
   return isFunction(getDerivedStateFromProps) || isFunction(getSnapshotBeforeUpdate)
 }
 
-function callGetDerivedStateFromProps (component, props, state) {
+function callGetDerivedStateFromProps(component, props, state) {
   const { getDerivedStateFromProps } = component.constructor
   let newState
   if (isFunction(getDerivedStateFromProps)) {
@@ -34,7 +34,7 @@ function callGetDerivedStateFromProps (component, props, state) {
   return newState
 }
 
-function callGetSnapshotBeforeUpdate (component, props, state) {
+function callGetSnapshotBeforeUpdate(component, props, state) {
   const { getSnapshotBeforeUpdate } = component
   let snapshot
   if (isFunction(getSnapshotBeforeUpdate)) {
@@ -43,7 +43,7 @@ function callGetSnapshotBeforeUpdate (component, props, state) {
   return snapshot
 }
 
-export function updateComponent (component) {
+export function updateComponent(component) {
   const { props, __propTypes } = component
   if (isDEV && __propTypes) {
     let componentName = component.constructor.name
@@ -92,7 +92,7 @@ export function updateComponent (component) {
   component.prevState = component.state
 }
 
-export function mountComponent (component) {
+export function mountComponent(component) {
   const { props } = component
   // 在willMount前执行构造函数的副本
   if (!component.__componentWillMountTriggered) {
@@ -119,7 +119,7 @@ export function mountComponent (component) {
   component.prevState = component.state
 }
 
-function injectContextType (component) {
+function injectContextType(component) {
   const ctxType = component.constructor.contextType
   if (ctxType) {
     const context = ctxType.context
@@ -136,7 +136,7 @@ function injectContextType (component) {
   }
 }
 
-function doUpdate (component, prevProps, prevState) {
+function doUpdate(component, prevProps, prevState) {
   const { state, props = {} } = component
   let data = state || {}
   if (component._createData) {

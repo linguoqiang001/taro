@@ -34,7 +34,7 @@ type ClassMethodsMap = Map<string, NodePath<t.ClassMethod | t.ClassProperty>>
 
 const NODE_MODULES = 'node_modules'
 
-function buildConstructor () {
+function buildConstructor() {
   const ctor = t.classMethod(
     'constructor',
     t.identifier('constructor'),
@@ -50,13 +50,13 @@ function buildConstructor () {
   return ctor
 }
 
-function processThisPropsFnMemberProperties (
+function processThisPropsFnMemberProperties(
   member: t.MemberExpression,
   path: NodePath<t.CallExpression>,
   args: Array<t.Expression | t.SpreadElement>
 ) {
   const propertyArray: string[] = []
-  function traverseMember (member: t.MemberExpression) {
+  function traverseMember(member: t.MemberExpression) {
     const object = member.object
     const property = member.property
 
@@ -128,13 +128,15 @@ class Transformer {
   private anonymousFuncCounter = incrementId()
   private importJSXs = new Set<String>()
   private refObjExpr: t.ObjectExpression[] = []
+  private wxsSourceMap = new Map<string, string[]>();
 
-  constructor (
+  constructor(
     path: NodePath<t.ClassDeclaration>,
     sourcePath: string,
     componentProperies: string[],
     sourceDir: string,
-    methods: ClassMethodsMap
+    methods: ClassMethodsMap,
+    wxsSourceMap: any
   ) {
     this.classPath = path
     this.sourcePath = sourcePath
@@ -142,10 +144,11 @@ class Transformer {
     this.moduleNames = Object.keys(path.scope.getAllBindings('module'))
     this.componentProperies = new Set(componentProperies)
     this.methods = methods
+    this.wxsSourceMap = wxsSourceMap;
     this.compile()
   }
 
-  setMultipleSlots () {
+  setMultipleSlots() {
     const body = this.classPath.node.body.body
     if (body.some(c => t.isClassProperty(c) && c.key.name === 'multipleSlots')) {
       return
@@ -155,7 +158,7 @@ class Transformer {
     body.push(multipleSlots)
   }
 
-  createStringRef (componentName: string, id: string, refName: string) {
+  createStringRef(componentName: string, id: string, refName: string) {
     this.refs.push({
       type: DEFAULT_Component_SET.has(componentName) ? 'dom' : 'component',
       id,
@@ -163,7 +166,7 @@ class Transformer {
     })
   }
 
-  createFunctionRef (componentName: string, id: string, fn) {
+  createFunctionRef(componentName: string, id: string, fn) {
     this.refs.push({
       type: DEFAULT_Component_SET.has(componentName) ? 'dom' : 'component',
       id,
@@ -171,7 +174,7 @@ class Transformer {
     })
   }
 
-  handleRefs () {
+  handleRefs() {
     this.refObjExpr = this.refs.map(ref => {
       return t.objectExpression([
         t.objectProperty(
@@ -212,7 +215,7 @@ class Transformer {
     }
   }
 
-  setComponentPath () {
+  setComponentPath() {
     let componentPath
     const nodeModulesIndex = this.sourcePath.indexOf(NODE_MODULES)
     if (nodeModulesIndex >= 0) {
@@ -249,7 +252,7 @@ class Transformer {
       classBody.push(t.classProperty(t.identifier(anonymousFuncName + 'Map'), t.objectExpression([])))
       const indexKey = stemParent.scope.generateUid('$indexKey')
       // tslint:disable-next-line: no-inner-declarations
-      function findParentLoopCallExprIndices (callExpr: NodePath<t.CallExpression>) {
+      function findParentLoopCallExprIndices(callExpr: NodePath<t.CallExpression>) {
         const indices: Set<t.Identifier> = new Set([])
         // tslint:disable-next-line: no-conditional-assignment
         while (callExpr = callExpr.findParent(p => isArrayMapCallExpression(p) && p !== callExpr) as NodePath<t.CallExpression>) {
@@ -375,7 +378,7 @@ class Transformer {
     ))
   }
 
-  traverse () {
+  traverse() {
     const self = this
     let hasRender = false
     self.classPath.traverse({
@@ -396,7 +399,7 @@ class Transformer {
         let idExpr: t.Expression
         if (!idAttr) {
           if (loopCallExpr && loopCallExpr.isCallExpression()) {
-            const [ func ] = loopCallExpr.node.arguments
+            const [func] = loopCallExpr.node.arguments
             let indexId: t.Identifier | null = null
             if (t.isFunctionExpression(func) || t.isArrowFunctionExpression(func)) {
               const params = func.params as t.Identifier[]
@@ -488,7 +491,7 @@ class Transformer {
           }
         }
       },
-      ClassMethod (classMethodPath) {
+      ClassMethod(classMethodPath) {
         const node = classMethodPath.node
         if (t.isIdentifier(node.key)) {
           const methodName = node.key.name
@@ -496,13 +499,13 @@ class Transformer {
           if (methodName.startsWith('render')) {
             if (!isContainJSXElement(classMethodPath)) {
               throw codeFrameError(classMethodPath.node, '以 render 开头的类函数必须返回 JSX，否则会导致渲染失败。如果是为了渲染字符串，建议更名。\n' +
-              '以 VSCode 为例：右键点击选择方法名，点击 rename symbol（重命名符号），输入新方法名。')
+                '以 VSCode 为例：右键点击选择方法名，点击 rename symbol（重命名符号），输入新方法名。')
             }
             hasRender = true
             self.renderJSX.set(methodName, classMethodPath)
             self.refIdMap.set(classMethodPath, new Set([]))
             classMethodPath.traverse({
-              ReturnStatement (returnPath) {
+              ReturnStatement(returnPath) {
                 const arg = returnPath.node.argument
                 const ifStem = returnPath.findParent(p => p.isIfStatement())
                 // tslint:disable-next-line: strict-type-predicates
@@ -514,7 +517,7 @@ class Transformer {
                 }
               },
               CallExpression: {
-                enter (callPath: NodePath<t.CallExpression>) {
+                enter(callPath: NodePath<t.CallExpression>) {
                   const callee = callPath.get('callee')
                   const args = callPath.node.arguments
                   if (callee.isMemberExpression()) {
@@ -538,7 +541,7 @@ class Transformer {
                     }
                   }
                 },
-                exit (callPath: NodePath<t.CallExpression>) {
+                exit(callPath: NodePath<t.CallExpression>) {
                   const jsxExpr = callPath.parentPath
                   if (!jsxExpr.isJSXExpressionContainer()) {
                     return
@@ -562,7 +565,7 @@ class Transformer {
           }
           if (methodName === 'constructor') {
             classMethodPath.traverse({
-              AssignmentExpression (p) {
+              AssignmentExpression(p) {
                 if (
                   t.isMemberExpression(p.node.left) &&
                   t.isThisExpression(p.node.left.object) &&
@@ -583,7 +586,7 @@ class Transformer {
         }
       },
       ClassBody: {
-        exit (path) {
+        exit(path) {
           const node = path.node as t.ClassBody
           if (!hasRender) {
             node.body.push(t.classMethod('method', t.identifier('_createData'), [], t.blockStatement([])))
@@ -603,7 +606,7 @@ class Transformer {
           })
         }
       },
-      ClassProperty (path) {
+      ClassProperty(path) {
         const { key: { name }, value } = path.node
         if (t.isArrowFunctionExpression(value) || t.isFunctionExpression(value)) {
           self.methods.set(name, path)
@@ -628,7 +631,7 @@ class Transformer {
           })
         }
       },
-      JSXExpressionContainer (path) {
+      JSXExpressionContainer(path) {
         const attr = path.findParent(p => p.isJSXAttribute()) as NodePath<t.JSXAttribute>
         if (!attr) {
           const expr = path.get('expression')
@@ -646,7 +649,7 @@ class Transformer {
         const jsxReferencedIdentifiers = self.refIdMap.get(renderMethod!)!
 
         path.traverse({
-          MemberExpression (path) {
+          MemberExpression(path) {
             const sibling = path.getSibling('property')
             if (
               path.get('object').isThisExpression() &&
@@ -717,7 +720,7 @@ class Transformer {
             if (
               (!isNewPropsSystem()) ||
               (t.isJSXIdentifier(jsx.node.name) && DEFAULT_Component_SET.has(jsx.node.name.name))
-              ) {
+            ) {
               self.buildPropsAnonymousFunc(attr, expr as any, false, path)
             }
           } else if (!t.isLiteral(expr)) {
@@ -734,7 +737,7 @@ class Transformer {
         if (isContainJSXElement(path)) return
         generateAnonymousState(scope, expression, jsxReferencedIdentifiers)
       },
-      Identifier (path) {
+      Identifier(path) {
         const isStartWithRender = /^render[A-Z]/.test(path.node.name)
         const isInJSXExprContainer = !!path.findParent(p => p.isJSXExpressionContainer())
         if (!isInJSXExprContainer) {
@@ -782,7 +785,7 @@ class Transformer {
           }
         }
       },
-      JSXElement (path) {
+      JSXElement(path) {
         const id = path.node.openingElement.name
         if (
           t.isJSXIdentifier(id) &&
@@ -890,7 +893,7 @@ class Transformer {
         }
       },
 
-      CallExpression (path) {
+      CallExpression(path) {
         const node = path.node
         const callee = node.callee
         if (t.isMemberExpression(callee) && t.isMemberExpression(callee.object)) {
@@ -977,7 +980,7 @@ class Transformer {
     }
   }
 
-  setComponents () {
+  setComponents() {
     const components: string[] = []
     this.customComponents.forEach((component, name) => {
       if (name.startsWith('Taro') && component.sourcePath === COMPONENTS_PACKAGE_NAME) {
@@ -1000,7 +1003,7 @@ class Transformer {
     )
   }
 
-  setMethods () {
+  setMethods() {
     const methods: Array<NodePath<t.ClassProperty | t.ClassMethod>> = (this.classPath as any).get('body').get('body')
     for (const method of methods) {
       if (method.isClassMethod()) {
@@ -1012,7 +1015,7 @@ class Transformer {
     }
   }
 
-  resetConstructor () {
+  resetConstructor() {
     const body = this.classPath.node.body.body
     if (!this.methods.has('constructor')) {
       const ctor = buildConstructor()
@@ -1039,7 +1042,7 @@ class Transformer {
     }
   }
 
-  handleLifecyclePropParam (propParam: t.LVal, properties: Set<string>) {
+  handleLifecyclePropParam(propParam: t.LVal, properties: Set<string>) {
     let propsName: string | null = null
     if (!propParam) {
       return null
@@ -1060,7 +1063,7 @@ class Transformer {
     return propsName
   }
 
-  findMoreProps () {
+  findMoreProps() {
     // 第一个参数是 props 的生命周期
     const lifeCycles = new Set([
       // 'constructor',
@@ -1087,7 +1090,7 @@ class Transformer {
         return
       }
       method.traverse({
-        MemberExpression (path) {
+        MemberExpression(path) {
           if (!path.isReferencedMemberExpression()) {
             return
           }
@@ -1096,7 +1099,7 @@ class Transformer {
             properties.add(property.name)
           }
         },
-        VariableDeclarator (path) {
+        VariableDeclarator(path) {
           const { id, init } = path.node
           if (t.isObjectPattern(id) && t.isIdentifier(init, { name: propsName })) {
             for (const prop of id.properties) {
@@ -1113,34 +1116,39 @@ class Transformer {
     })
   }
 
-  parseRender () {
+  parseRender() {
     if (this.importJSXs.size) {
       this.importJSXs.forEach(s => {
         this.result.template += s + '\n'
       })
     }
+    this.wxsSourceMap.forEach((value, key) => {
+      if (/\.wxs$/.test(key)) {
+        this.result.template += `${this.result.template}<wxs module="${value}" src="${key}" /> \n`
+      }
+    })
     if (this.renderJSX.size) {
       this.renderJSX.forEach((method, methodName) => {
         this.result.template = this.result.template
-        + new RenderParser(
-          method,
-          this.methods,
-          this.initState,
-          this.refIdMap.get(method)!,
-          this.usedState,
-          this.customComponentNames,
-          this.componentProperies,
-          this.loopRefs,
-          this.refObjExpr,
-          methodName
-        ).outputTemplate + '\n'
+          + new RenderParser(
+            method,
+            this.methods,
+            this.initState,
+            this.refIdMap.get(method)!,
+            this.usedState,
+            this.customComponentNames,
+            this.componentProperies,
+            this.loopRefs,
+            this.refObjExpr,
+            methodName
+          ).outputTemplate + '\n'
       })
     } else {
       throw codeFrameError(this.classPath.node.loc, '没有定义 render 方法')
     }
   }
 
-  clearClosureMethods () {
+  clearClosureMethods() {
     this.classPath.node.body.body = this.classPath.node.body.body.filter(m => {
       if (m && t.isClassMethod(m) && t.isIdentifier(m.key) && m.key.name.startsWith('_createClosure')) {
         return false
@@ -1149,7 +1157,7 @@ class Transformer {
     })
   }
 
-  compile () {
+  compile() {
     this.traverse()
     this.setMethods()
     this.setComponents()

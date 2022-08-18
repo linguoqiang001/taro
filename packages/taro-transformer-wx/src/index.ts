@@ -37,7 +37,8 @@ import {
   GEN_LOOP_COMPID,
   CONTEXT_PROVIDER,
   setIsTaroReady,
-  setCompId
+  setCompId,
+  wxsFileRegx
 } from './constant'
 import { Adapters, setAdapter, Adapter } from './adapter'
 import { Options, setTransformOptions, buildBabelTransformOptions } from './options'
@@ -46,7 +47,7 @@ import { isTestEnv } from './env'
 
 const template = require('babel-template')
 
-function getIdsFromMemberProps (member: t.MemberExpression) {
+function getIdsFromMemberProps(member: t.MemberExpression) {
   let ids: string[] = []
   const { object, property } = member
   if (t.isMemberExpression(object)) {
@@ -64,13 +65,13 @@ function getIdsFromMemberProps (member: t.MemberExpression) {
   return ids
 }
 
-  /**
-   * TS 编译器会把 class property 移到构造器，
-   * 而小程序要求 `config` 和所有函数在初始化(after new Class)之后就收集到所有的函数和 config 信息，
-   * 所以当如构造器里有 this.func = () => {...} 的形式，就给他转换成普通的 classProperty function
-   * 如果有 config 就给他还原
-   */
-function resetTSClassProperty (body: (t.ClassMethod | t.ClassProperty)[]) {
+/**
+ * TS 编译器会把 class property 移到构造器，
+ * 而小程序要求 `config` 和所有函数在初始化(after new Class)之后就收集到所有的函数和 config 信息，
+ * 所以当如构造器里有 this.func = () => {...} 的形式，就给他转换成普通的 classProperty function
+ * 如果有 config 就给他还原
+ */
+function resetTSClassProperty(body: (t.ClassMethod | t.ClassProperty)[]) {
   for (const method of body) {
     if (t.isClassMethod(method) && method.kind === 'constructor') {
       if (t.isBlockStatement(method.body)) {
@@ -102,7 +103,7 @@ function resetTSClassProperty (body: (t.ClassMethod | t.ClassProperty)[]) {
   }
 }
 
-function handleClosureJSXFunc (jsx: NodePath<t.JSXElement>, mainClass: NodePath<t.ClassDeclaration>) {
+function handleClosureJSXFunc(jsx: NodePath<t.JSXElement>, mainClass: NodePath<t.ClassDeclaration>) {
   // 在 ./functional.ts 会把 FunctionExpression 转化为 arrowFunctionExpr
   // 所以我们这里只处理一种情况
   const arrowFunc = jsx.findParent(p => p.isArrowFunctionExpression())
@@ -128,7 +129,7 @@ function handleClosureJSXFunc (jsx: NodePath<t.JSXElement>, mainClass: NodePath<
   }
 }
 
-function findDeclarationScope (path: NodePath<t.Node>, id: t.Identifier) {
+function findDeclarationScope(path: NodePath<t.Node>, id: t.Identifier) {
   const scopePath = path.findParent(p => !!p.scope.getOwnBindingIdentifier(id.name))
   if (scopePath) {
     return scopePath
@@ -136,7 +137,7 @@ function findDeclarationScope (path: NodePath<t.Node>, id: t.Identifier) {
   throw codeFrameError(path.node, '该引用从未被定义')
 }
 
-function buildFullPathThisPropsRef (id: t.Identifier, memberIds: string[], path: NodePath<t.Node>) {
+function buildFullPathThisPropsRef(id: t.Identifier, memberIds: string[], path: NodePath<t.Node>) {
   const scopePath = findDeclarationScope(path, id)
   const binding = scopePath.scope.getOwnBinding(id.name)
   if (binding) {
@@ -158,14 +159,14 @@ function buildFullPathThisPropsRef (id: t.Identifier, memberIds: string[], path:
   }
 }
 
-function handleThirdPartyComponent (expr: t.ClassMethod | t.ClassProperty) {
+function handleThirdPartyComponent(expr: t.ClassMethod | t.ClassProperty) {
   if (t.isClassProperty(expr) && expr.key.name === 'config' && t.isObjectExpression(expr.value)) {
     const properties = expr.value.properties
     findThirdPartyComponent(properties)
   }
 }
 
-function findThirdPartyComponent (properties: (t.ObjectMethod | t.ObjectProperty | t.SpreadProperty)[]) {
+function findThirdPartyComponent(properties: (t.ObjectMethod | t.ObjectProperty | t.SpreadProperty)[]) {
   for (const prop of properties) {
     if (
       t.isObjectProperty(prop) &&
@@ -207,7 +208,7 @@ export interface TransformOptions extends Options {
   //
 }
 
-export default function transform (options: TransformOptions): TransformResult {
+export default function transform(options: TransformOptions): TransformResult {
   if (options.adapter) {
     setAdapter(options.adapter)
     if (Adapter.type === Adapters.quickapp) {
@@ -234,6 +235,7 @@ export default function transform (options: TransformOptions): TransformResult {
     components: []
   }
   THIRD_PARTY_COMPONENTS.clear()
+  // 要解析的源码
   const code = options.isTyped
     ? ts.transpile(options.code, {
       jsx: options.sourcePath.endsWith('.tsx') ? ts.JsxEmit.Preserve : ts.JsxEmit.None,
@@ -252,21 +254,6 @@ export default function transform (options: TransformOptions): TransformResult {
   // 原因大概是 babylon.parse 没有生成 File 实例导致 scope 和 path 原型上都没有 `file`
   // 将来升级到 babel@7 可以直接用 parse 而不是 transform
   const ast = parse(code, buildBabelTransformOptions()).ast as t.File
-  // traverse(ast, {
-  //   JSXElement (p) {
-  //     setIsNormal(false)
-  //     p.stop()
-  //   },
-  //   ImportDeclaration (path) {
-  //     const { source, specifiers } = path.node
-  //     if (source.value === TARO_PACKAGE_NAME) {
-  //       if (specifiers.some(s => s.local.name === 'Component')) {
-  //         setIsNormal(false)
-  //         path.stop()
-  //       }
-  //     }
-  //   }
-  // })
   if (options.isNormal) {
     if (options.isTyped) {
       const mainClassNode = ast.program.body.find(v => {
@@ -294,9 +281,61 @@ export default function transform (options: TransformOptions): TransformResult {
   let storeName!: string
   let renderMethod!: NodePath<t.ClassMethod>
   let isImportTaro = false
+  let wxsSourceMap = new Map();
+  traverse(ast, {
+    ImportDeclaration(path) {
+      const source = path.node.source.value
+      let name = '';
+      path.traverse({
+        ImportDefaultSpecifier(path) {
+          name = path.node.local.name;
+        }
+      })
+      if (wxsFileRegx.test(source)) {
+        wxsSourceMap.set(source, name);
+        path.remove();
+      }
+    },
+    JSXAttribute(path) {
+      const { name, value } = path.node
+      if (value && t.isJSXExpressionContainer(value)) {
+        const { expression } = value;
+        if (t.isMemberExpression(expression)) {
+          if (t.isIdentifier(expression.object)) {
+            const { name: objName } = expression.object;
+            const binding = path.scope.getBinding(objName);
+            if (binding && t.isImportDeclaration(binding.path.parent)) {
+              const sourcePath = binding.path.parent.source.value;
+              const code = generate(value).code;
+              if (wxsFileRegx.test(sourcePath)) {
+                path.replaceWith(t.jSXAttribute(name, t.stringLiteral(`{${code}}`)))
+              };
+            }
+          }
+        }
+      }
+    },
+    JSXExpressionContainer(path) {
+      const { expression } = path.node;
+      if (t.isMemberExpression(expression)) {
+        if (t.isIdentifier(expression.object)) {
+          const { name } = expression.object;
+          const binding = path.scope.getBinding(name);
+          if (binding && t.isImportDeclaration(binding.path.parent)) {
+            const sourcePath = binding.path.parent.source.value;
+            const code = generate(path.node).code;
+            if (wxsFileRegx.test(sourcePath)) {
+              path.replaceWith(t.jSXText(`{${code}}`))
+            };
+          }
+        }
+      }
+    }
+  })
+  // // 经过traverse的代码"import Taro, { Component as __BaseComponent, internal_safe_get, internal_get_original, internal_inline_style, handleLoopRef, genCompid, genLoopCompid, propsManager } from '@tarojs/taro';\nimport { View, Text } from '@tarojs/components';\nimport Com from \"../../components/com1\";\nimport Com2 from \"../../components/com2\";\nimport './index.scss';\nexport default class Index extends __BaseComponent {\n  constructor(props) {\n    super(props);\n  }\n  componentWillMount() {\n    console.log('componentWillMount');\n  }\n  componentDidMount() {\n    this.test();\n  }\n  test() {\n    let a = 1;\n    let b = 2;\n    return \"3hello\";\n  }\n  render() {\n    console.log('render');\n    return <View className=\"index\">\n        <Text>红红火火</Text>\n        <Com />\n        <Com2 />\n      </View>;\n  }\n  config = {\n    enablePullDownRefresh: false,\n    navigationStyle: 'custom'\n  };\n}"
   traverse(ast, {
     Program: {
-      exit (path: NodePath<t.Program>) {
+      exit(path: NodePath<t.Program>) {
         for (const stem of path.node.body) {
           if (t.isImportDeclaration(stem)) {
             if (stem.source.value === TARO_PACKAGE_NAME) {
@@ -310,7 +349,7 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    MemberExpression (path) {
+    MemberExpression(path) {
       const { property } = path.node
       const right = path.getSibling('right')
       if (t.isIdentifier(property, { name: 'config' }) && path.parentPath.isAssignmentExpression() && right.isObjectExpression()) {
@@ -318,7 +357,7 @@ export default function transform (options: TransformOptions): TransformResult {
         findThirdPartyComponent(properties)
       }
     },
-    JSXText (path) {
+    JSXText(path) {
       if (Adapter.type !== Adapters.quickapp) {
         return
       }
@@ -329,7 +368,7 @@ export default function transform (options: TransformOptions): TransformResult {
 
       replaceJSXTextWithTextComponent(path)
     },
-    TemplateLiteral (path) {
+    TemplateLiteral(path) {
       const nodes: t.Expression[] = []
       const { quasis, expressions } = path.node
       let index = 0
@@ -360,7 +399,7 @@ export default function transform (options: TransformOptions): TransformResult {
       }
       path.replaceWith(root)
     },
-    ClassDeclaration (path) {
+    ClassDeclaration(path) {
       mainClass = path
       const superClass = getSuperClassCode(path)
       if (superClass) {
@@ -378,10 +417,10 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    ClassExpression (path) {
+    ClassExpression(path) {
       mainClass = path as any
     },
-    ClassMethod (path) {
+    ClassMethod(path) {
       if (t.isIdentifier(path.node.key)) {
         if (path.node.key.name === 'render') {
           renderMethod = path
@@ -389,7 +428,7 @@ export default function transform (options: TransformOptions): TransformResult {
         classMethods.set(path.node.key.name, path)
       }
     },
-    IfStatement (path) {
+    IfStatement(path) {
       const consequent = path.get('consequent')
       if (!consequent.isBlockStatement()) {
         consequent.replaceWith(
@@ -399,7 +438,7 @@ export default function transform (options: TransformOptions): TransformResult {
         )
       }
     },
-    CallExpression (path) {
+    CallExpression(path) {
       const callee = path.get('callee')
       if (isContainJSXElement(path)) {
         return
@@ -473,7 +512,7 @@ export default function transform (options: TransformOptions): TransformResult {
     //   const expr = parentPath.get('value.expression')
 
     // },
-    JSXMemberExpression (path) {
+    JSXMemberExpression(path) {
       const { property, object } = path.node
       if (!t.isJSXIdentifier(property, { name: 'Provider' })) {
         throw codeFrameError(property, '只能在使用 Context.Provider 的情况下才能使用 JSX 成员表达式')
@@ -490,7 +529,7 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    JSXElement (path) {
+    JSXElement(path) {
       const assignment = path.findParent(p => p.isAssignmentExpression())
       if (assignment && assignment.isAssignmentExpression() && !options.isTyped) {
         const left = assignment.node.left
@@ -511,7 +550,7 @@ export default function transform (options: TransformOptions): TransformResult {
       if (switchStatement && switchStatement.isSwitchStatement()) {
         const { discriminant, cases } = switchStatement.node
         const ifStatement = cases.map((Case, index) => {
-          const [ consequent ] = Case.consequent
+          const [consequent] = Case.consequent
           if (!t.isBlockStatement(consequent)) {
             throw codeFrameError(switchStatement.node, '含有 JSX 的 switch case 语句必须每种情况都用花括号 `{}` 包裹结果')
           }
@@ -549,7 +588,7 @@ export default function transform (options: TransformOptions): TransformResult {
 
       const loopCallExpr = path.findParent(p => isArrayMapCallExpression(p))
       if (loopCallExpr && loopCallExpr.isCallExpression()) {
-        const [ func ] = loopCallExpr.node.arguments
+        const [func] = loopCallExpr.node.arguments
         if (t.isArrowFunctionExpression(func) && !t.isBlockStatement(func.body)) {
           func.body = t.blockStatement([
             t.returnStatement(func.body)
@@ -558,7 +597,7 @@ export default function transform (options: TransformOptions): TransformResult {
       }
       handleClosureJSXFunc(path, mainClass)
     },
-    JSXOpeningElement (path) {
+    JSXOpeningElement(path) {
       const { name } = path.node.name as t.JSXIdentifier
       const binding = path.scope.getBinding(name)
       if (process.env.NODE_ENV !== 'test' && binding && binding.kind === 'module') {
@@ -613,7 +652,7 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    JSXAttribute (path) {
+    JSXAttribute(path) {
       const { name, value } = path.node
 
       if (options.jsxAttributeNameReplace) {
@@ -672,7 +711,7 @@ export default function transform (options: TransformOptions): TransformResult {
         // @TODO: bind 的处理待定
       }
     },
-    ClassProperty (path) {
+    ClassProperty(path) {
       const { key: { name }, value } = path.node
       if (t.isArrowFunctionExpression(value) || t.isFunctionExpression(value)) {
         classMethods.set(name, path)
@@ -704,7 +743,7 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    AssignmentExpression (path) {
+    AssignmentExpression(path) {
       if (Adapter.type !== Adapters.quickapp) {
         return
       }
@@ -723,7 +762,7 @@ export default function transform (options: TransformOptions): TransformResult {
         }
       }
     },
-    ImportDeclaration (path) {
+    ImportDeclaration(path) {
       const source = path.node.source.value
       if (importSources.has(source)) {
         throw codeFrameError(path.node, '无法在同一文件重复 import 相同的包。')
@@ -778,11 +817,11 @@ export default function transform (options: TransformOptions): TransformResult {
         })
       }
       path.traverse({
-        ImportDefaultSpecifier (path) {
+        ImportDefaultSpecifier(path) {
           const name = path.node.local.name
           names.push(name)
         },
-        ImportSpecifier (path) {
+        ImportSpecifier(path) {
           const name = path.node.imported.name
           names.push(name)
           if (source === TARO_PACKAGE_NAME && name === 'Component') {
@@ -840,8 +879,10 @@ export default function transform (options: TransformOptions): TransformResult {
     }
   }
 
+  // 用途未知
   mainClass.node.body.body.forEach(handleThirdPartyComponent)
   const storeBinding = mainClass.scope.getBinding(storeName)
+  // 将类extends Component 改为 extends __BaseComponent
   mainClass.scope.rename('Component', '__BaseComponent')
   if (storeBinding) {
     const statementPath = storeBinding.path.getStatementParent()
@@ -882,7 +923,7 @@ export default function transform (options: TransformOptions): TransformResult {
       code
     }
   }
-  result = new Transformer(mainClass, options.sourcePath, componentProperies, options.sourceDir!, classMethods).result
+  result = new Transformer(mainClass, options.sourcePath, componentProperies, options.sourceDir!, classMethods, wxsSourceMap).result
   result.code = generate(ast).code
   result.ast = ast
   const lessThanSignReg = new RegExp(lessThanSignPlacehold, 'g')

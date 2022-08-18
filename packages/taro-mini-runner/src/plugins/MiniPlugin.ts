@@ -175,6 +175,7 @@ export default class MiniPlugin {
   dependencies: Map<string, TaroSingleEntryDependency>
   quickappImports: Map<string, Set<{ path: string, name: string }>>
   subPackages: Set<string>
+  wxsCache: any[];
 
   constructor(options = {}) {
     this.options = defaults(options || {}, {
@@ -210,7 +211,7 @@ export default class MiniPlugin {
     this.dependencies = new Map()
     this.quickappImports = new Map()
     this.subPackages = new Set()
-
+    this.wxsCache = [];
     this.parseConstantsList()
   }
 
@@ -222,13 +223,6 @@ export default class MiniPlugin {
       callback(err)
     }
   }
-
-  // compiler.hooks.afterEmit.tapAsync(
-  //   PLUGIN_NAME,
-  //   this.tryAsync(async compilation => {
-  //     await this.addTarBarFilesToDependencies(compilation)
-  //   })
-  // )
 
   parseConstantsList() {
     const parsedConstantsReplaceList = {}
@@ -254,6 +248,7 @@ export default class MiniPlugin {
       fileType,
       isBuildQuickapp
     } = this.options
+    // webpack已经跑起来了，在编译之前有缓存，则启用缓存，这样可以提高效率。
     compiler.hooks.run.tapAsync(
       PLUGIN_NAME,
       this.tryAsync(async (compiler: webpack.Compiler) => {
@@ -315,6 +310,16 @@ export default class MiniPlugin {
       compilation.dependencyFactories.set(SingleEntryDependency, normalModuleFactory)
       compilation.dependencyFactories.set(TaroSingleEntryDependency, normalModuleFactory)
 
+      compilation.hooks.buildModule.tap(
+        PLUGIN_NAME,
+        (module) => {
+          const depPath = module.resource;
+          if (/\.wxs$/.test(depPath)) {
+            this.wxsCache.push(module);
+          }
+        }
+      );
+
       // afterOptimizeAssets：asset 已经优化
       compilation.hooks.afterOptimizeChunkAssets.tap(PLUGIN_NAME, chunks => {
         chunks.forEach(chunk => {
@@ -360,6 +365,17 @@ export default class MiniPlugin {
         this.addedComponents.clear()
       })
     )
+
+    compiler.hooks.emit.tapAsync(PLUGIN_NAME, this.tryAsync((compilation, callback) => {
+      this.wxsCache.forEach(item => {
+        const relativePath = this.getRelativePath(item.resource);
+        const source = item._source;
+        compilation.assets[relativePath] = {
+          source: () => source._value,
+          size: () => source.size()
+        }
+      })
+    }));
 
     compiler.hooks.afterEmit.tapAsync(
       PLUGIN_NAME,
@@ -590,8 +606,10 @@ export default class MiniPlugin {
   getPages(compiler) {
     const { buildAdapter, constantsReplaceList, nodeModulesPath, alias, isBuildQuickapp } = this.options
     const appEntry = this.appEntry
+    // 获取app.tsx内容
     const code = fs.readFileSync(appEntry).toString()
     try {
+      // 对app.tsx解析成ast
       const transformResult = wxTransformer({
         code,
         sourcePath: appEntry,
@@ -1147,6 +1165,7 @@ export default class MiniPlugin {
     this.tabBarIcons = new Set()
     this.quickappStyleFiles = new Set()
     this.addedComponents = new Set()
+    // 如果没有编译插件，走默认编译
     if (!this.options.isBuildPlugin) {
       this.getPages(compiler)
       this.getComponents(compiler, this.pages, true)

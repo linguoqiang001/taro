@@ -11,6 +11,7 @@ const customizeChain = async (chain, modifyWebpackChainFunc: Function, customize
     await modifyWebpackChainFunc(chain, webpack)
   }
   if (customizeFunc instanceof Function) {
+    // ？？
     customizeFunc(chain, webpack, PARSE_AST_TYPE)
   }
 }
@@ -18,6 +19,7 @@ const customizeChain = async (chain, modifyWebpackChainFunc: Function, customize
 export default async function build(appPath: string, config: IBuildConfig) {
   const mode = config.mode
   const baseWebpackChain = baseConf(appPath)
+  // 调用modifyWebpackChain hook
   await customizeChain(baseWebpackChain, config.modifyWebpackChain, config.webpackChain)
   const buildWebpackConf = buildConf(appPath, mode, config, baseWebpackChain)
   const webpackChain = baseWebpackChain.merge(buildWebpackConf)
@@ -54,6 +56,7 @@ export default async function build(appPath: string, config: IBuildConfig) {
       })
     } else {
       bindProdLogger(compiler)
+      // webpack编译,对taro语法转译成小程序语法，添加运行时代码等
       compiler.run((err, stats) => {
         if (err) {
           printBuildError(err)
@@ -67,6 +70,7 @@ export default async function build(appPath: string, config: IBuildConfig) {
           return reject(err)
         }
         if (typeof onBuildFinish === 'function') {
+          // 调用onBuildFinish hook
           onBuildFinish({
             error: null,
             stats,

@@ -16,7 +16,7 @@ export default (ctx) => {
       '--port [port]': 'Specified port',
       '--release': 'Release quickapp'
     },
-    async fn (opts) {
+    async fn(opts) {
       const { platform, config } = opts
       const { fs, chalk, PROJECT_CONFIG } = ctx.helper
       const { outputPath, configPath } = ctx.paths
@@ -57,14 +57,15 @@ export default (ctx) => {
       }
 
       await ctx.applyPlugins('onBuildStart')
+      // 调用weapp hook
       await ctx.applyPlugins({
         name: platform,
         opts: {
           config: {
             ...config,
             isWatch,
-            mode: isProduction ? 'production': 'development',
-            async modifyWebpackChain (chain, webpack) {
+            mode: isProduction ? 'production' : 'development',
+            async modifyWebpackChain(chain, webpack) {
               await ctx.applyPlugins({
                 name: 'modifyWebpackChain',
                 initialVal: chain,
@@ -74,7 +75,7 @@ export default (ctx) => {
                 }
               })
             },
-            async modifyBuildAssets (assets) {
+            async modifyBuildAssets(assets) {
               await ctx.applyPlugins({
                 name: 'modifyBuildAssets',
                 initialVal: assets,
@@ -83,7 +84,7 @@ export default (ctx) => {
                 }
               })
             },
-            async modifyBuildTempFileContent (tempFiles) {
+            async modifyBuildTempFileContent(tempFiles) {
               await ctx.applyPlugins({
                 name: 'modifyBuildTempFileContent',
                 initialVal: tempFiles,
@@ -92,7 +93,7 @@ export default (ctx) => {
                 }
               })
             },
-            async onBuildFinish ({ error, stats, isWatch }) {
+            async onBuildFinish({ error, stats, isWatch }) {
               await ctx.applyPlugins({
                 name: 'onBuildFinish',
                 opts: {
@@ -109,7 +110,7 @@ export default (ctx) => {
   })
 }
 
-function registerBuildHooks (ctx) {
+function registerBuildHooks(ctx) {
   [
     'modifyWebpackChain',
     'modifyBuildAssets',
@@ -121,7 +122,7 @@ function registerBuildHooks (ctx) {
   })
 }
 
-async function checkConfig ({ projectConfig, configPath }) {
+async function checkConfig({ projectConfig, configPath }) {
   const result = await configValidator({
     configPath,
     projectConfig
@@ -129,7 +130,7 @@ async function checkConfig ({ projectConfig, configPath }) {
   return result
 }
 
-function findFilesWithExt (dirname, ext) {
+function findFilesWithExt(dirname, ext) {
   const glob = require('glob')
   const pattern = Array.isArray(ext) ? `${dirname}/**/*{${ext.join(',')}}` : `${dirname}/**/*${ext}`
   const files = glob.sync(pattern)
@@ -144,7 +145,7 @@ const PLUGIN_TERSER = '@tarojs/plugin-terser'
 
 const PLUGINS_CONFIG_DOC = 'https://nervjs.github.io/taro/docs/config-detail#plugins'
 
-function hadAddPlugin (plugins, pluginName) {
+function hadAddPlugin(plugins, pluginName) {
   let hadAdd = false
   plugins.forEach(item => {
     if (item.id === pluginName || item.name === pluginName) {
@@ -154,7 +155,7 @@ function hadAddPlugin (plugins, pluginName) {
   return hadAdd
 }
 
-async function checkPlugin (ctx, isWatch) {
+async function checkPlugin(ctx, isWatch) {
   const plugins = ctx.plugins
   const sassFiles = findFilesWithExt(ctx.paths.sourcePath, ['.scss', '.sass'])
   if (sassFiles.length && !hadAddPlugin(plugins, PLUGIN_SASS)) {
